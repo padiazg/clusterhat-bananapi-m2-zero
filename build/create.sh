@@ -170,7 +170,7 @@ EOF
             sed -i "s/\(.*\)/#\1/" $MNT/etc/ld.so.cache
         fi
 
-        if [ $RELEASE = "ARMBIAN64BOOKWORM" -o $RELEASE = "ARMBIAN64BULLSEYE"]; then
+        if [ $RELEASE = "ARMBIAN64BOOKWORM" -o $RELEASE = "ARMBIAN64BULLSEYE" ]; then
             chroot $MNT systemctl disable network-manager
             chroot $MNT systemctl stop network-manager
 
