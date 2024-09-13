@@ -33,7 +33,7 @@ Run the create script
 ```shell
 $ cd build
 $ sudo rm -rf dest/* ||  sudo rm -rf mnt/*
-$ sudo ./create.sh Orangepicm4_1.0.6
+$ sudo ./create.sh Armbian_22.08.0
 ```
 
 ## Differences from upstream

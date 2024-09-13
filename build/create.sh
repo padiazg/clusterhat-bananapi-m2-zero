@@ -170,7 +170,7 @@ EOF
             sed -i "s/\(.*\)/#\1/" $MNT/etc/ld.so.cache
         fi
 
-        if [ $RELEASE = "ARMBIAN64BOOKWORM" ]; then
+        if [ $RELEASE = "ARMBIAN64BOOKWORM" -o $RELEASE = "ARMBIAN64BULLSEYE"]; then
             chroot $MNT systemctl disable network-manager
             chroot $MNT systemctl stop network-manager
 
@@ -185,7 +185,7 @@ EOF
             echo "nameserver 8.8.8.8" > $MNT/etc/resolv.conf
         fi
 
-        chroot $MNT apt -y remove --purge network-manager netplan.io iperf3 # docker-ce docker-ce-cli vim vim-runtime vim-common iw
+        chroot $MNT apt -y purge network-manager iperf3 
 
         # Get any updates / install and remove pacakges
         chroot $MNT apt update -y
