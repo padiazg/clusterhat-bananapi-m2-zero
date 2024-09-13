@@ -1,0 +1,35 @@
+#!/bin/bash
+TYPE=usbboot
+VERSION=$1
+KERNEL=$2
+
+source /etc/os-release
+
+# Bookworm uses initramfs so this is not needed
+if [ $VERSION_CODENAME = "bookworm" ];then
+	exit
+fi
+
+CNT7=`echo $VERSION|grep -c -- '-v7\+'`
+CNT71=`echo $VERSION|grep -c -- '-v71\+'`
+CNT8=`echo $VERSION|grep -c -- '-v8\+'`
+if [ -f /etc/default/clusterctrl ];then
+. /etc/default/clusterctrl
+fi
+
+# Only rebuild the kernel for USBBOOT installs
+if [ "$TYPE" = "usbboot" ];then
+ if [ "$CNT71" = "1" ];then
+  echo "Building initramfs71 for 4B(32)"
+  /usr/sbin/mkinitramfs -v -o /boot/initramfs71.img $VERSION
+ elif [ "$CNT7" = "1" ];then
+  echo "Building initramfs7 for 3A+/CM3/CM3+"
+  /usr/sbin/mkinitramfs -v -o /boot/initramfs7.img $VERSION
+ elif [ "$CNT8" = "1" ];then
+  echo "Building initramfs8 for 4B(64)"
+  /usr/sbin/mkinitramfs -v -o /boot/initramfs8.img $VERSION
+ else
+  echo "Building initramfs for A+/CM1/PiZero"
+  /usr/sbin/mkinitramfs -v -o /boot/initramfs.img $VERSION
+ fi
+fi

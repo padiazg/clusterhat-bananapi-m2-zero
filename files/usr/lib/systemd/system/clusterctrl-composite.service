@@ -1,0 +1,11 @@
+[Unit]
+Description=ClusterCTRL USB Gadget
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/composite-clusterctrl start
+ExecStop=/usr/sbin/composite-clusterctrl stop
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
