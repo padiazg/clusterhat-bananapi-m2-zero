@@ -1,6 +1,6 @@
 
 #
-# Interface definitions for Cluster CTRL (bridged controller)
+# Interface definitions for Cluster CTRL (nat controller)
 #
 
 auto brint br0

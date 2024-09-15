@@ -36,6 +36,15 @@ $ sudo rm -rf dest/* ||  sudo rm -rf mnt/*
 $ sudo ./create.sh Armbian_22.08.0
 ```
 
+## Networking
+When using a CNAT controller you can create a `/boot/cnat` file to tell the reconfigure script to setup the network interface accordingly.
+
+The networking setup is at `/etc/systemd/network/10-usb0.link` and `/etc/systemd/network/10-usb0.network`
+
+When using a CBRIDGE controller there's no need to create any file and you should remove the `/boot/cnat` file so the reconfigure script sets the network interface properly.
+
+> TODO: improve these settings when using a bridged controller so you can always access the Px nodes using the `172.19.181.x` addresses
+
 ## Differences from upstream
 * As we are using images for boards different than Raspberry Pi the `/boot/cmdline.txt` is not available so we must use `/boot/orangepiEnv.txt` for setting init scripts. 
 * 32bit processors are out of the scope, we on;y support 64bit proccessors. 

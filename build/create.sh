@@ -171,12 +171,15 @@ EOF
         fi
 
         if [ $RELEASE = "ARMBIAN64BOOKWORM" -o $RELEASE = "ARMBIAN64BULLSEYE" ]; then
+            # disable NetworkManager
             chroot $MNT systemctl disable network-manager
             chroot $MNT systemctl stop network-manager
 
+            # use systemd-networked to manage networking
             chroot $MNT systemctl enable systemd-networkd
             chroot $MNT systemctl start systemd-networkd
 
+            # systemd-resolved prevents apt from reaching its servers
             chroot $MNT systemctl stop systemd-resolved
             chroot $MNT systemctl disable systemd-resolved
             # ln -s $MNT/run/systemd/resolve/resolv.conf $MNT/etc/resolv.conf
@@ -200,20 +203,18 @@ EOF
 
 
         INSTALL="bridge-utils initramfs-tools-core screen git nfs-kernel-server busybox gpiod"
-        INSTALL+=" libusb-1.0-0-dev libgpiod2" # libs
+        INSTALL+=" libusb-1.0-0-dev libgpiod2" 
         INSTALL+=" python3-smbus python3-usb python3-usb1 python3-libusb1 python3-libgpiod" # needed by clusterctrl
         INSTALL+=" netfilter-persistent iptables-persistent" 
 
 
-        if [ $RELEASE =  "ARMBIAN64BOOKWORM" ]; then
+        if [ $RELEASE =  "ARMBIAN64BOOKWORM" -o "ARMBIAN64BULLSEYE" ]; then
             INSTALL+=" armbian-config"
         fi
 
         chroot $MNT /bin/bash -c "APT_LISTCHANGES_FRONTEND=none apt -y install $INSTALL"
         
         # Remove ModemManager
-        # chroot $MNT systemctl disable ModemManager.service
-        # ERROR: Failed to disable unit, unit ModemManager.service does not exist.
         chroot $MNT apt -y purge modemmanager
         chroot $MNT apt-mark hold modemmanager
 
@@ -246,7 +247,7 @@ EOF
         if [ ! -z $PASSWORD ];then
             if [ ! -z $USERNAME ];then
                 PASSWORDE=$(echo "$PASSWORD" | openssl passwd -6 -stdin)
-                chroot $MNT useradd $USERNAME --password $PASSWORDE --create-home --groups tty,disk,dialout,sudo,audio,video,plugdev,games,users,systemd-journal,input,netdev
+                chroot $MNT useradd $USERNAME --password $PASSWORDE --create-home -s /usr/bin/zsh --groups tty,disk,dialout,sudo,audio,video,plugdev,games,users,systemd-journal,input,netdev
             else
                 chroot $MNT /bin/bash -c "echo 'pi:$PASSWORD' | chpasswd"
             fi
@@ -273,68 +274,8 @@ EOF
             rpi-update "$RPIUPDATE"
         fi
 
-        # Disable APIPA addresses on ethpiX and set fallback IPs
-
-        # We give this an "unconfigured" IP of 172.19.181.253
-        # Pi Zeros should be reconfigured to 172.19.181.X where X is the P number
-        # NAT Controller is on 172.19.181.254
-        # A USB network (usb0) device plugged into the controller will have fallback IP of 172.19.181.253
-
-        if [ $RELEASE = "ARMBIAN64BOOKWORM" -o $RELEASE = "JAMMY" ];then
-            cat << EOF >> $MNT/etc/dhcp/dhclient.conf
-# START ClusterCTRL config
-timeout 10;
-initial-interval 2;
-lease { # Px
-  interface "usb0";
-  fixed-address 172.19.181.253; # ClusterCTRL Px
-  option subnet-mask 255.255.255.0;
-  option routers 172.19.181.254;
-  option domain-name-servers 8.8.8.8;
-  renew never;
-  rebind never;
-  expire never;
-}
-
-lease { # Controller
-  interface "br0";
-  fixed-address 172.19.181.254;
-  option subnet-mask 255.255.255.0;
-  option domain-name-servers 8.8.8.8;
-  renew never;
-  rebind never;
-  expire never;
-}
-# END ClusterCTRL config
-EOF
-        else 
-            cat << EOF >> $MNT/etc/dhcpcd.conf
-# ClusterCTRL
-reboot 15
-denyinterfaces ethpi* ethupi* ethupi*.10 brint eth0 usb0.10
-
-profile clusterctrl_fallback_usb0
-static ip_address=172.19.181.253/24 #ClusterCTRL
-static routers=172.19.181.254
-static domain_name_servers=8.8.8.8 208.67.222.222
-
-profile clusterctrl_fallback_br0
-static ip_address=172.19.181.254/24
-
-interface usb0
-fallback clusterctrl_fallback_usb0
-
-interface br0
-fallback clusterctrl_fallback_br0
-EOF
-        fi
-
         # Enable uart with login
         # TODO
-        # SERIALCONSOLE=$(grep -c "^enable_uart=1" $MNT/$FW/config.txt)
-        # if [ $SERIALCONSOLE -eq 0 ]; then
-        #     echo "enable_uart=1" >>  $MNT/$FW/config.txt
-        # fi
 
         # Enable I2C (used for I/O expander on Cluster HAT v2.x)
         # we don't need it now as we are creating this image for Px images

@@ -15,6 +15,12 @@ reboot_pi () {
   exit 0
 }
 
+if [ -z $1 ];then
+  # Unknown argument passed - do nothing
+  echo "No reconfig"
+  exit 0
+fi
+
 mount -t proc proc /proc
 mount -t sysfs sys /sys
 
@@ -35,130 +41,115 @@ if [ -f /etc/os-release ]; then
   source /etc/os-release
 fi
 
-if [ ! -z $1 ];then
+mount -o remount,rw /
 
-  mount -o remount,rw /
+NUMBER='^[0-9]+$'
+if [ ${#1} -gt 1 ] && [ ${1:0:1} = "p" ] && [[ ${1:1} =~ $NUMBER  ]] && [ ${1:1} -gt 0 ] && [ ${1:1} -lt 253 ]; then
 
-  NUMBER='^[0-9]+$'
-  if [ $1 = "cnat" ] || [ $1 = "cbridge" ] || { [ ${#1} -gt 1 ] && [ ${1:0:1} = "p" ] && [[ ${1:1} =~ $NUMBER  ]] && [ ${1:1} -gt 0 ] && [ ${1:1} -lt 253 ]; }; then
+  # Backup kernel cmdline.txt file
+  INIT_CONF=$BOOT/armbianEnv.txt
+  rm -f $INIT_CONF.old
+  cp -s $INIT_CONF $INIT_CONF.old
 
-    # Backup kernel cmdline.txt file
-    INIT_CONF=$BOOT/armbianEnv.txt
-    rm -f $INIT_CONF.old
-    cp -s $INIT_CONF $INIT_CONF.old
+  # Remove config file entries and add them back in later if needed
+  # sed -i "s# console=ttyGS0##" $INIT_CONF  
+  sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl cbridge\(.*\)/\1\2/' $INIT_CONF
+  sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl cnat\(.*\)/\1\2/' $INIT_CONF
+  sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl p[0-9]\(.*\)/\1\2/' $INIT_CONF
+  sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl cbridge\(.*\)/\1\2/' $INIT_CONF
+  sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl cnat\(.*\)/\1\2/' $INIT_CONF
+  sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl p[0-9]\(.*\)/\1\2/' $INIT_CONF
 
-    # Remove config file entries and add them back in later if needed
-    # sed -i "s# console=ttyGS0##" $INIT_CONF  
-    sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl cbridge\(.*\)/\1\2/' $INIT_CONF
-    sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl cnat\(.*\)/\1\2/' $INIT_CONF
-    sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl p[0-9]\(.*\)/\1\2/' $INIT_CONF
-    sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl cbridge\(.*\)/\1\2/' $INIT_CONF
-    sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl cnat\(.*\)/\1\2/' $INIT_CONF
-    sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl p[0-9]\(.*\)/\1\2/' $INIT_CONF
+  if [ -f /etc/dhcpcd.conf ]; then
+    # sed -i "s/^\(denyinterfaces.*\) eth0\(.*\)/\1\2/" /etc/dhcpcd.conf
+    rm /etc/dhcpcd.conf
+  fi
+  if [ -f /etc/dhcp/dhclient.conf ]; then
+    rm /etc/dhcp/dhclient.conf
+  fi
 
-    if [ -f /etc/dhcpcd.conf ]; then
-      sed -i "s/^\(denyinterfaces.*\) eth0\(.*\)/\1\2/" /etc/dhcpcd.conf
-    fi
-    if [ -f /etc/default/clusterctrl ];then
-      sed -i '/TYPE=.*/d' /etc/default/clusterctrl
-      sed -i '/ID=.*/d' /etc/default/clusterctrl
-      RESIZE=0
-    else
-      # Only run resize/firstboot on the first boot
-      RESIZE=1
-      cp -f "$CONFIGDIR/default-clusterctrl" /etc/default/clusterctrl
-    fi
+  if [ -f /etc/default/clusterctrl ];then
+    sed -i '/TYPE=.*/d' /etc/default/clusterctrl
+    sed -i '/ID=.*/d' /etc/default/clusterctrl
+    RESIZE=0
+  else
+    # Only run resize/firstboot on the first boot
+    RESIZE=1
+    cp -f "$CONFIGDIR/default-clusterctrl" /etc/default/clusterctrl
+  fi
 
-    # Setup the interfaces/issue files
-    if [ "$1" = "cnat" ];then
-      rm -f /etc/network/interfaces.d/clusterctrl
-      if [ $VERSION_CODENAME = "bookworm" -o $VERSION_CODENAME = "jammy" ];then
-        cp -f "$CONFIGDIR/interfaces.bookworm.cnat" /etc/network/interfaces.d/clusterctrl
-      else
-        cp -f "$CONFIGDIR/interfaces.cnat" /etc/network/interfaces.d/clusterctrl
-      fi
-      cp -f "$CONFIGDIR/issue.c" /etc/issue
-      # TODO: check orangepi debian equivalent
-      #  sed -i "s/^dtoverlay=dwc2.*$/#dtoverlay=dwc2,dr_mode=peripheral/" /$BOOT/config.txt
-      #  sed -i "s/^#otg_mode=1 # Controller only$/otg_mode=1 # Controller only/" /$BOOT/config.txt
-      sed -i "s#^127.0.1.1.*#127.0.1.1\tcnat#g" /etc/hosts
-      echo "cnat" > /etc/hostname
-      if [ -f /etc/dhcpcd.conf ]; then
-        sed -i 's~^static ip_address=172.19.181.*/24 #Cluster.*~static ip_address=172.19.181.253/24 #ClusterCTRL~' /etc/dhcpcd.conf
-      fi
-      rm -f /etc/systemd/system/getty.target.wants/getty@ttyGS0.service
-      sed -i "s/^#net.ipv4.ip_forward=1 # Cluster.*/net.ipv4.ip_forward=1 # ClusterCTRL/" /etc/sysctl.conf
-      systemctl enable clusterctrl-init
-      systemctl disable clusterctrl-composite
-      echo "TYPE=cnat" >> /etc/default/clusterctrl
-    elif [ "$1" = "cbridge" ];then
-      rm -f /etc/network/interfaces.d/clusterctrl
-      if [ $VERSION_CODENAME = "bookworm" -o $VERSION_CODENAME = "jammy" ];then
-        cp -f "$CONFIGDIR/interfaces.bookworm.cbridge" /etc/network/interfaces.d/clusterctrl
-      else
-        cp -f "$CONFIGDIR/interfaces.cbridge" /etc/network/interfaces.d/clusterctrl
-      fi
-      cp -f "$CONFIGDIR/issue.c" /etc/issue
-      # TODO: check orangepi debian equivalent
-      #  sed -i "s/^dtoverlay=dwc2.*$/#dtoverlay=dwc2,dr_mode=peripheral/" /$BOOT/config.txt
-      #  sed -i "s/^#otg_mode=1 # Controller only$/otg_mode=1 # Controller only/" /$BOOT/config.txt
-      sed -i "s#^127.0.1.1.*#127.0.1.1\tcbridge#g" /etc/hosts
-      echo "cbridge" > /etc/hostname
-      if [ -f /etc/dhcpcd.conf ]; then
-        sed -i 's~^static ip_address=172.19.181.*/24 #Cluster.*~static ip_address=172.19.181.253/24 #ClusterCTRL~' /etc/dhcpcd.conf
-        sed -i 's#^\(denyinterfaces.*\)#\1 eth0#' /etc/dhcpcd.conf
-      fi
-      rm -f /etc/systemd/system/getty.target.wants/getty@ttyGS0.service
-      sed -i "s/^net.ipv4.ip_forward=1 # ClusterCTRL/#net.ipv4.ip_forward=1 # ClusterCTRL/" /etc/sysctl.conf
-      systemctl enable clusterctrl-init
-      systemctl disable clusterctrl-composite
-      echo "TYPE=c" >> /etc/default/clusterctrl
-    else
-      P=${1:1}
-      rm -f /etc/network/interfaces.d/clusterctrl
-      if [ $VERSION_CODENAME = "bookworm" -o $VERSION_CODENAME = "jammy" ];then
-        cp -f "$CONFIGDIR/interfaces.bookworm.p" /etc/network/interfaces.d/clusterctrl
-      fi
-      cp -f "$CONFIGDIR/issue.p" /etc/issue
-      sed -i "s#^127.0.1.1.*#127.0.1.1\t$1#g" /etc/hosts
-      # sed -i "s/^#dtoverlay=dwc2.*$/dtoverlay=dwc2,dr_mode=peripheral/" /$BOOT/config.txt
-      # sed -i "s/^otg_mode=1 # Controller only$/#otg_mode=1 # Controller only/" /$BOOT/config.txt
+  # Setup the interfaces/issue files
+  P=${1:1}
+  rm -f /etc/network/interfaces.d/clusterctrl
+  rm -f /etc/systemd/network/*
+  
+  echo "$1" > /etc/hostname
+  
+  cat >/etc/systemd/network/10-usb0.link << END
+[Match]
+OriginalName=usb0
+Driver=g_ether
 
-      echo "$1" > /etc/hostname
-      
-      if [ $VERSION_CODENAME = "bookworm" ]; then
-        echo $MNT/etc/systemd/network/20-dhcp.network << END
+[Link]
+MACAddress=00:22:82:ff:ff:0$P
+END
+
+  # Defaults to brigged controller. If $BOOT/cnat exists then assume natted controller
+  if [ -f $BOOT/cnat ]; then
+    cat >/etc/systemd/network/10-usb0.network << END
 [Match]
 Name=usb0
+MACAddress=00:22:82:ff:ff:0$P
+
+[Link]
+RequiredForOnline=no
 
 [Network]
+Description=Interface usb0 for P$P
+DHCP=no
+
+[Address]
 Address=172.19.181.$P/24
 Gateway=172.19.181.254
-END
-      else
-        if [ -f /etc/dhcpcd.conf ]; then
-          sed -i "s~^static ip_address=172.19.181.*/24 #Cluster.*~static ip_address=172.19.181.$P/24 #ClusterCTRL~" /etc/dhcpcd.conf
-        fi
-        if [ -f /etc/dhcp/dhclient.conf ];then
-          sed -i "s~^  fixed-address 172\.19\.181\..* # ClusterCTRL Px~  fixed-address 172.19.181.$P; # ClusterCTRL Px~" /etc/dhcp/dhclient.conf
-        fi
-      fi
-      
-      ln -fs /lib/systemd/system/getty@.service \
-        /etc/systemd/system/getty.target.wants/getty@ttyGS0.service
-      systemctl disable clusterctrl-init
-      sed -i "s/^net.ipv4.ip_forward=1 # ClusterCTRL/#net.ipv4.ip_forward=1 # ClusterCTRL/" /etc/sysctl.conf
-      echo "TYPE=node" >> /etc/default/clusterctrl
-      echo "ID=$P" >> /etc/default/clusterctrl
-      systemctl enable clusterctrl-composite
-    fi
+Label=usb0:1
 
+[Route]
+Destination=0.0.0.0/0
+Gateway=172.19.181.254
+END
   else
-    # Unknown argument passed - do nothing
-    echo "No reconfig"
+  cat >/etc/systemd/network/10-usb0.network << END
+[Match]
+Name=usb0
+MACAddress=00:22:82:ff:ff:0$P
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Description=Interface usb0 for P$P
+DHCP=yes
+
+[DHCP]
+RouteMetric=100
+
+[Address]
+Address=172.19.181.$P/24
+Gateway=172.19.181.254
+Label=usb0:1
+END
   fi
-  mount -o remount,ro /
+
+  ln -fs /lib/systemd/system/getty@.service \
+    /etc/systemd/system/getty.target.wants/getty@ttyGS0.service
+  systemctl disable clusterctrl-init
+  sed -i "s/^net.ipv4.ip_forward=1 # ClusterCTRL/#net.ipv4.ip_forward=1 # ClusterCTRL/" /etc/sysctl.conf
+  echo "TYPE=node" >> /etc/default/clusterctrl
+  echo "ID=$P" >> /etc/default/clusterctrl
+  systemctl enable clusterctrl-composite
 fi
+
+mount -o remount,ro /
 
 # if [ $RESIZE -eq 1 ];then
 #  if [ -f /usr/lib/raspberrypi-sys-mods/firstboot ];then
@@ -168,7 +159,6 @@ fi
 #  fi
 # fi
 
-# mount /$BOOT -o remount,ro
 sync
 
 # Reboot the Pi
