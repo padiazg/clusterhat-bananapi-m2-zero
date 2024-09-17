@@ -13,16 +13,13 @@ DEST=./dest
 # Directory to mount source/destination files
 MNT=./mnt
 
-# Directory to mount source files (only required for usbboot.sh)
-# MNT2=./mnt2
-
 # Location of Cluster HAT files on target images
 CONFIGDIR="/usr/share/clusterhat"
 
 # Default username/password (both must be set)
 # These details are added to userconf.txt in the boot partition.
-USERNAME=""
-PASSWORD="raspberry"
+USERNAME="pi"
+PASSWORD="clusterctrl"
 
 # Enable SSH
 ENABLESSH=0
@@ -35,6 +32,7 @@ UPGRADE=0
 
 # Set eth0 to use dhcp on cnat images
 CNAT_ETH0=0
+CNAT_IMAGES=0
 
 # Max Px nodes to build for lite/std/full
 MAXPLITE=4

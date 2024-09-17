@@ -243,11 +243,14 @@ COMMIT
 # Completed on Fri Mar 13 00:00:00 2018
 EOF
 
+        # Set user groups
+        USER_GROUPS=tty,disk,dialout,sudo,audio,video,plugdev,games,users,systemd-journal,input,netdev
+
         # Set custom password
         if [ ! -z $PASSWORD ];then
             if [ ! -z $USERNAME ];then
                 PASSWORDE=$(echo "$PASSWORD" | openssl passwd -6 -stdin)
-                chroot $MNT useradd $USERNAME --password $PASSWORDE --create-home -s /usr/bin/zsh --groups tty,disk,dialout,sudo,audio,video,plugdev,games,users,systemd-journal,input,netdev
+                chroot $MNT useradd $USERNAME --password $PASSWORDE --create-home -s /usr/bin/zsh --groups $USER_GROUPS
             else
                 chroot $MNT /bin/bash -c "echo 'pi:$PASSWORD' | chpasswd"
             fi
@@ -385,12 +388,12 @@ EOF
     MAXP="MAXP$VARNAME" # Build variable name to check
     if [ ${!MAXP} -gt 0 ] && [ ${!MAXP} -lt 253 ] && [ -f $DEST/$DESTFILENAME-CBRIDGE.img ];then
         for ((P=1;P<=${!MAXP};P++));do
-            if [ -f $DEST/$DESTFILENAME-p$P.img ];then
-                echo "Skipping $VARNAME P$P (file exists)"
+            if [ -f $DEST/$DESTFILENAME-p$P-CBRIDGE.img ];then
+                echo "Skipping $VARNAME P$P-CBRIDGE (file exists)"
             else
-                echo "Creating $VARNAME P$P"
-                cp $DEST/$DESTFILENAME-CBRIDGE.img $DEST/$DESTFILENAME-p$P.img
-                LOOP=`losetup -fP --show $DEST/$DESTFILENAME-p$P.img`
+                echo "Creating $VARNAME P$P-CBRIDGE"
+                cp $DEST/$DESTFILENAME-CBRIDGE.img $DEST/$DESTFILENAME-p$P-CBRIDGE.img
+                LOOP=`losetup -fP --show $DEST/$DESTFILENAME-p$P-CBRIDGE.img`
                 sleep $SLEEP
 
                 mount ${LOOP}p1 $MNT
@@ -409,6 +412,26 @@ EOF
                 
                 sleep $SLEEP
                 losetup -d $LOOP
+            fi
+
+            if [ $CNAT_IMAGES -eq 1 ]; then 
+                if [ -f $DEST/$DESTFILENAME-p$P-CNAT.img ];then
+                    echo "Skipping $VARNAME P$P-CNAT (file exists)"
+                else
+                    echo "Creating $VARNAME P$P-CBRIDGE"
+                    cp $DEST/$DESTFILENAME-p$P-CBRIDGE.img $DEST/$DESTFILENAME-p$P-CNAT.img
+                    LOOP=`losetup -fP --show $DEST/$DESTFILENAME-p$P-CNAT.img`
+                    sleep $SLEEP
+
+                    mount ${LOOP}p1 $MNT
+                    touch $MNT/boot/cnat
+                    sleep $SLEEP
+                    sync
+                    umount $MNT
+                    
+                    sleep $SLEEP
+                    losetup -d $LOOP
+                fi
             fi
         done
     fi
