@@ -34,6 +34,9 @@ UPGRADE=0
 CNAT_ETH0=0
 CNAT_IMAGES=0
 
+# Set boot verbosity. Defaults to 1 which means less verbose, maximum value is 7. 0 means no change
+BOOTVERBOSITY=0
+
 # Max Px nodes to build for lite/std/full
 MAXPLITE=4
 MAXPSTD=0

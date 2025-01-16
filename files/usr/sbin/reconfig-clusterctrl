@@ -53,12 +53,10 @@ if [ ${#1} -gt 1 ] && [ ${1:0:1} = "p" ] && [[ ${1:1} =~ $NUMBER  ]] && [ ${1:1}
 
   # Remove config file entries and add them back in later if needed
   # sed -i "s# console=ttyGS0##" $INIT_CONF  
-  sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl cbridge\(.*\)/\1\2/' $INIT_CONF
-  sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl cnat\(.*\)/\1\2/' $INIT_CONF
-  sed -i 's/^\(extraargs=.*\)init=\/usr\/sbin\/reconfig-clusterctrl p[0-9]\(.*\)/\1\2/' $INIT_CONF
-  sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl cbridge\(.*\)/\1\2/' $INIT_CONF
-  sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl cnat\(.*\)/\1\2/' $INIT_CONF
-  sed -i 's/^\(extraargs=.*\)init=\/sbin\/reconfig-clusterctrl p[0-9]\(.*\)/\1\2/' $INIT_CONF
+  sed -i \
+    -e "s/init=\/usr\/sbin\/reconfig-clusterctrl \(cbridge\|cnat\|p[0-9]\)\s*//gm" \
+    -e "s/init=\/sbin\/reconfig-clusterctrl \(cbridge\|cnat\|p[0-9]\)\s*//gm" \
+    $INIT_CONF
 
   if [ -f /etc/dhcpcd.conf ]; then
     # sed -i "s/^\(denyinterfaces.*\) eth0\(.*\)/\1\2/" /etc/dhcpcd.conf

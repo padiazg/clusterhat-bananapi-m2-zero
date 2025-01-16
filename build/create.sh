@@ -307,10 +307,17 @@ EOF
         (tar --exclude=.git -cC ../files/ -f - .) | (chroot $MNT tar -xvC /)
 
         # Disable the auto filesystem resize and convert to bridged controller
-        if grep -q "^extraargs=" "$file"; then
-            sed -i 's/^extraargs=\(.*\)/extraargs=\1 init=\/usr\/sbin\/reconfig-clusterctrl cbridge/' $MNT/$FW/armbianEnv.txt
+        if grep -q "^extraargs=" $MNT/$FW/armbianEnv.txt; then
+                sed -i \
+                    -e "s/init=\/usr\/sbin\/reconfig-clusterctrl \(cbridge\|cnat\|p[1-4]\)\s*//gm" \
+                    -e "s/^extraargs=\(.*\)/extraargs=\1 init=\/usr\/sbin\/reconfig-clusterctrl cbridge/gm" \
+                    $MNT/$FW/armbianEnv.txt
         else
             echo "extraargs=init=/usr/sbin/reconfig-clusterctrl cbridge">> $MNT/$FW/armbianEnv.txt
+        fi
+
+        if [ $BOOTVERBOSITY -ge 1 -a $BOOTVERBOSITY -le 7 ]; then
+            sed -i "s/verbosity=[0-9]/verbosity=$BOOTVERBOSITY/gm" $MNT/$FW/armbianEnv.txt
         fi
 
         # Setup directories for rpiboot
@@ -397,7 +404,10 @@ EOF
                 sleep $SLEEP
 
                 mount ${LOOP}p1 $MNT
-                sed -i "s/^extraargs=\(.*\)/extraargs=\1 init=\/usr\/sbin\/reconfig-clusterctrl p$P/" $MNT/$FW/armbianEnv.txt
+                sed -i \
+                    -e "s/init=\/usr\/sbin\/reconfig-clusterctrl \(cbridge\|cnat\|p[1-4]\)\s*//gm" \
+                    -e "s/^extraargs=\(.*\)/extraargs=\1 init=\/usr\/sbin\/reconfig-clusterctrl p$P/gm" \
+                    $MNT/$FW/armbianEnv.txt
                 
                 echo -e "libcomposite\nsunxi\ng_ether\nusb_f_acm\nu_ether\nusb_f_rndis" > $MNT/etc/modules
                 mkdir -p $MNT/etc/modprobe.d
